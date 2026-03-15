@@ -2,46 +2,45 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.models.user import User
-from app.schemas.user_schema import UserCreate, UserResponse
-from app.schemas.user_schema import UserLogin, TokenResponse
-from app.services.security import verify_password, create_access_token
-from sqlalchemy import select
-from app.services.security import hash_password
+from app.schemas.user_schema import UserCreate, UserResponse, UserLogin, TokenResponse
+from app.services.security import hash_password, verify_password, create_access_token, get_current_user
 
 router = APIRouter()
 
 
-@router.post("/register", response_model=UserResponse)
+@router.post("/register", response_model=UserResponse, status_code=201)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
-
-    hashed_password = hash_password(user.password)
+    existing = db.query(User).filter(User.email == user.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
 
     new_user = User(
         email=user.email,
-        password_hash=hashed_password,
-        role="USER"
+        password_hash=hash_password(user.password),
+        role="user"
     )
-
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-
     return new_user
+
 
 @router.post("/login", response_model=TokenResponse)
 def login_user(user: UserLogin, db: Session = Depends(get_db)):
-
     db_user = db.query(User).filter(User.email == user.email).first()
 
-    if not db_user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    if not verify_password(user.password, db_user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not db_user or not verify_password(user.password, db_user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = create_access_token({"user_id": db_user.id})
 
     return {
         "access_token": token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "user": db_user
     }
+
+
+@router.get("/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
