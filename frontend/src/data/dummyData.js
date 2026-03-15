@@ -1,14 +1,257 @@
-export const posts = {
-  positive: [
-    { id: 1, text: "BrandAid helped improve our brand reputation monitoring.", platform: "Twitter" },
-    { id: 2, text: "Amazing analytics dashboard!", platform: "Reddit" }
-  ],
+// ─── Platforms ────────────────────────────────────────────────
+export const PLATFORMS = ['Twitter', 'Reddit', 'Instagram', 'Facebook', 'LinkedIn', 'YouTube', 'TikTok']
 
-  neutral: [
-    { id: 3, text: "Just discovered BrandAid recently.", platform: "News" }
-  ],
+// ─── Sentiment Posts ──────────────────────────────────────────
+export const dummyPosts = [
+  // POSITIVE
+  {
+    id: 'p1',
+    text: 'Absolutely love what BrandAid has done with their new product line! The quality is top-notch and customer service is incredible. Highly recommend to everyone.',
+    platform: 'Twitter',
+    date: '2024-12-10',
+    sentiment: 'positive',
+    riskLevel: 'low',
+    source: 'https://twitter.com',
+    author: '@happycustomer',
+  },
+  {
+    id: 'p2',
+    text: 'Just tried the new BrandAid service and it blew my expectations out of the water. This company really listens to feedback and delivers.',
+    platform: 'Reddit',
+    date: '2024-12-09',
+    sentiment: 'positive',
+    riskLevel: 'low',
+    source: 'https://reddit.com',
+    author: 'u/techreviewer99',
+  },
+  {
+    id: 'p3',
+    text: 'BrandAid is genuinely a game changer. Their pricing is fair and the product does exactly what it promises. Five stars.',
+    platform: 'Instagram',
+    date: '2024-12-08',
+    sentiment: 'positive',
+    riskLevel: 'low',
+    source: 'https://instagram.com',
+    author: '@brandlover',
+  },
+  {
+    id: 'p4',
+    text: 'Been using BrandAid for 3 months now. It keeps getting better. Their team is responsive and the updates are frequent.',
+    platform: 'LinkedIn',
+    date: '2024-12-07',
+    sentiment: 'positive',
+    riskLevel: 'low',
+    source: 'https://linkedin.com',
+    author: 'Jane D.',
+  },
+  {
+    id: 'p5',
+    text: 'Incredible experience with BrandAid support team. They resolved my issue in under 10 minutes. Best support I\'ve had from any tech company.',
+    platform: 'Facebook',
+    date: '2024-12-06',
+    sentiment: 'positive',
+    riskLevel: 'low',
+    source: 'https://facebook.com',
+    author: 'Mark S.',
+  },
+  {
+    id: 'p6',
+    text: 'If you\'re looking for a reliable brand monitoring tool, look no further than BrandAid. Clean UI, fast results, great value.',
+    platform: 'Twitter',
+    date: '2024-12-05',
+    sentiment: 'positive',
+    riskLevel: 'low',
+    source: 'https://twitter.com',
+    author: '@saasreviewer',
+  },
+  {
+    id: 'p7',
+    text: 'BrandAid helped us catch a potential PR crisis early. We saved thousands of dollars in damage control. Cannot recommend enough.',
+    platform: 'LinkedIn',
+    date: '2024-12-04',
+    sentiment: 'positive',
+    riskLevel: 'low',
+    source: 'https://linkedin.com',
+    author: 'CMO at TechCorp',
+  },
+  // NEUTRAL
+  {
+    id: 'n1',
+    text: 'BrandAid is an okay product. Does what it says on the tin. Nothing too exciting but it works for our basic needs.',
+    platform: 'Reddit',
+    date: '2024-12-10',
+    sentiment: 'neutral',
+    riskLevel: 'low',
+    source: 'https://reddit.com',
+    author: 'u/neutralreview',
+  },
+  {
+    id: 'n2',
+    text: 'Tried BrandAid for a week. It has some nice features but also some rough edges. Will continue testing before making a decision.',
+    platform: 'Twitter',
+    date: '2024-12-09',
+    sentiment: 'neutral',
+    riskLevel: 'low',
+    source: 'https://twitter.com',
+    author: '@marketer101',
+  },
+  {
+    id: 'n3',
+    text: 'The onboarding for BrandAid is a bit confusing at first. Once you get used to it, it\'s manageable. Documentation could be better.',
+    platform: 'YouTube',
+    date: '2024-12-08',
+    sentiment: 'neutral',
+    riskLevel: 'low',
+    source: 'https://youtube.com',
+    author: 'TechTalkersYT',
+  },
+  {
+    id: 'n4',
+    text: 'BrandAid updated their pricing. Not sure if the new tiers are better or worse for small businesses. Still evaluating.',
+    platform: 'Facebook',
+    date: '2024-12-07',
+    sentiment: 'neutral',
+    riskLevel: 'medium',
+    source: 'https://facebook.com',
+    author: 'Small Biz Owners Group',
+  },
+  {
+    id: 'n5',
+    text: 'Compared BrandAid with two other tools. BrandAid is somewhere in the middle — not the cheapest, not the most feature-rich.',
+    platform: 'LinkedIn',
+    date: '2024-12-06',
+    sentiment: 'neutral',
+    riskLevel: 'low',
+    source: 'https://linkedin.com',
+    author: 'Product Analyst',
+  },
+  {
+    id: 'n6',
+    text: 'BrandAid had some downtime last Tuesday. Support acknowledged the issue and said it was resolved. Keeping an eye on reliability.',
+    platform: 'Reddit',
+    date: '2024-12-05',
+    sentiment: 'neutral',
+    riskLevel: 'medium',
+    source: 'https://reddit.com',
+    author: 'u/uptimewatch',
+  },
+  // NEGATIVE
+  {
+    id: 'neg1',
+    text: 'Very disappointed with BrandAid. The sentiment analysis is often wrong and the UI is laggy on large datasets. Expected much more.',
+    platform: 'Reddit',
+    date: '2024-12-10',
+    sentiment: 'negative',
+    riskLevel: 'high',
+    source: 'https://reddit.com',
+    author: 'u/frustrated_marketer',
+  },
+  {
+    id: 'neg2',
+    text: 'BrandAid customer support is terrible. Been waiting 3 days for a response to a billing issue. Will be cancelling my subscription.',
+    platform: 'Twitter',
+    date: '2024-12-09',
+    sentiment: 'negative',
+    riskLevel: 'high',
+    source: 'https://twitter.com',
+    author: '@angrycustomer22',
+  },
+  {
+    id: 'neg3',
+    text: 'Do NOT use BrandAid if you need real-time data. The delays are unacceptable and the reports are often inaccurate. Huge waste of money.',
+    platform: 'Facebook',
+    date: '2024-12-08',
+    sentiment: 'negative',
+    riskLevel: 'high',
+    source: 'https://facebook.com',
+    author: 'Digital Agency Owner',
+  },
+  {
+    id: 'neg4',
+    text: 'BrandAid just raised prices by 40% with only a week\'s notice. Loyal customers deserve better than this. Looking for alternatives.',
+    platform: 'Twitter',
+    date: '2024-12-07',
+    sentiment: 'negative',
+    riskLevel: 'high',
+    source: 'https://twitter.com',
+    author: '@pricedout_user',
+  },
+  {
+    id: 'neg5',
+    text: 'The BrandAid mobile app is essentially broken. Crashes on startup half the time. Their dev team clearly doesn\'t test properly.',
+    platform: 'Reddit',
+    date: '2024-12-06',
+    sentiment: 'negative',
+    riskLevel: 'medium',
+    source: 'https://reddit.com',
+    author: 'u/mobiletester',
+  },
+  {
+    id: 'neg6',
+    text: 'Lost important report data after a BrandAid server migration. No compensation offered. Extremely unprofessional handling of the situation.',
+    platform: 'LinkedIn',
+    date: '2024-12-05',
+    sentiment: 'negative',
+    riskLevel: 'high',
+    source: 'https://linkedin.com',
+    author: 'Enterprise Client',
+  },
+]
 
-  negative: [
-    { id: 4, text: "Customer support response was slow.", platform: "Twitter" }
-  ]
+// ─── Metrics ──────────────────────────────────────────────────
+export const dummyMetrics = {
+  totalMentions: 1284,
+  positiveMentions: 621,
+  neutralMentions: 389,
+  negativeMentions: 274,
+  sentimentScore: 68,
+  trend: '+12%',
+}
+
+// ─── Reports ─────────────────────────────────────────────────
+export const dummyReports = [
+  {
+    id: 'r1',
+    name: 'BrandAid Full Analysis — Dec 2024',
+    dateGenerated: '2024-12-10',
+    filters: { platform: 'All', sentiment: 'All', riskLevel: 'All', dateRange: 'Dec 1–10, 2024' },
+    downloadUrl: '#',
+  },
+  {
+    id: 'r2',
+    name: 'Negative Mentions Deep Dive',
+    dateGenerated: '2024-12-08',
+    filters: { platform: 'Twitter, Reddit', sentiment: 'Negative', riskLevel: 'High', dateRange: 'Nov 25–Dec 8, 2024' },
+    downloadUrl: '#',
+  },
+  {
+    id: 'r3',
+    name: 'Weekly Brand Health Report',
+    dateGenerated: '2024-12-05',
+    filters: { platform: 'All', sentiment: 'All', riskLevel: 'All', dateRange: 'Nov 28–Dec 5, 2024' },
+    downloadUrl: '#',
+  },
+  {
+    id: 'r4',
+    name: 'LinkedIn & LinkedIn Sentiment Export',
+    dateGenerated: '2024-12-01',
+    filters: { platform: 'LinkedIn', sentiment: 'Positive', riskLevel: 'Low', dateRange: 'Nov 2024' },
+    downloadUrl: '#',
+  },
+  {
+    id: 'r5',
+    name: 'Risk Alerts Report — High Priority',
+    dateGenerated: '2024-11-28',
+    filters: { platform: 'All', sentiment: 'Negative', riskLevel: 'High', dateRange: 'Nov 21–28, 2024' },
+    downloadUrl: '#',
+  },
+]
+
+// ─── Default Config ────────────────────────────────────────────
+export const defaultConfig = {
+  brandName: 'BrandAid',
+  keywords: ['BrandAid', 'brand aid', '#BrandAid'],
+  socialHandles: { twitter: '@BrandAid', instagram: '@brandaid_official', linkedin: 'BrandAid Inc' },
+  platforms: ['Twitter', 'Reddit', 'LinkedIn'],
+  riskKeywords: ['scam', 'fraud', 'terrible', 'cancel', 'refund', 'lawsuit', 'broken'],
 }
