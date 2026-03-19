@@ -18,3 +18,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# ML
+ml/model/
+ml/data/
+ml/cc.en.300.bin
+ml/cc.en.300.bin.gz
