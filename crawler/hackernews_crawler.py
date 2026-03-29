@@ -1,7 +1,4 @@
-"""
-Hacker News Crawler — searches HN for brand mentions in stories and comments.
-Uses the official Algolia HN Search API — no key required.
-"""
+import re
 import requests
 from datetime import datetime
 from crawler.base_crawler import BaseCrawler
@@ -12,16 +9,12 @@ HN_ITEM_URL = "https://news.ycombinator.com/item?id={id}"
 
 
 class HackerNewsCrawler(BaseCrawler):
-    def __init__(self, db: Session, platform_id: int, brand_id: int, keywords: list):
-        super().__init__(db, platform_id, brand_id, keywords)
+    def __init__(self, db: Session, platform_id: int, brand_id: int, keywords: list, brand_name: str = ""):
+        super().__init__(db, platform_id, brand_id, keywords, brand_name)
 
-    def _search(self, keyword: str, tags: str = "story,comment", max_results: int = 20) -> list:
+    def _search(self, keyword: str, max_results: int = 20) -> list:
         try:
-            params = {
-                "query": keyword,
-                "tags": tags,
-                "hitsPerPage": max_results,
-            }
+            params = {"query": keyword, "tags": "story,comment", "hitsPerPage": max_results}
             res = requests.get(HN_SEARCH_URL, params=params, timeout=10)
             res.raise_for_status()
             return res.json().get("hits", [])
@@ -31,48 +24,21 @@ class HackerNewsCrawler(BaseCrawler):
 
     def fetch(self) -> list:
         results = []
-
         for keyword in self.keywords:
             print(f"[HackerNews] Searching for: {keyword}")
-            hits = self._search(keyword, tags="story,comment", max_results=15)
-
+            hits = self._search(keyword, max_results=15)
             for hit in hits:
-                # Get text content
                 text = hit.get("comment_text") or hit.get("story_text") or hit.get("title", "")
-
-                # Clean HTML
-                import re
                 text = re.sub(r"<[^>]+>", "", text)
                 text = re.sub(r"\s+", " ", text).strip()
-
                 if not text or len(text) < 10:
                     continue
-
                 item_id = hit.get("objectID", "")
                 source_url = HN_ITEM_URL.format(id=item_id)
-
                 created_ts = hit.get("created_at_i")
-                if created_ts:
-                    created_at = datetime.utcfromtimestamp(created_ts)
-                else:
-                    created_at = datetime.utcnow()
-
-                author = hit.get("author", "")
-
-                results.append({
-                    "text": text,
-                    "source_url": source_url,
-                    "author": author,
-                    "created_at": created_at,
-                })
-
-        # Deduplicate
+                created_at = datetime.utcfromtimestamp(created_ts) if created_ts else datetime.utcnow()
+                results.append({"text": text, "source_url": source_url, "author": hit.get("author", ""), "created_at": created_at})
         seen = set()
-        unique = []
-        for item in results:
-            if item["source_url"] not in seen:
-                seen.add(item["source_url"])
-                unique.append(item)
-
+        unique = [item for item in results if item["source_url"] not in seen and not seen.add(item["source_url"])]
         print(f"[HackerNews] Total unique items: {len(unique)}")
         return unique

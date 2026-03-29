@@ -1,6 +1,6 @@
 """
 Base crawler — all crawlers inherit from this.
-Handles common logic: deduplication, DB saving, sentiment analysis.
+Handles common logic: deduplication, filtering, DB saving, sentiment analysis.
 """
 import sys
 import os
@@ -11,14 +11,16 @@ from sqlalchemy.orm import Session
 ML_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "ml")
 sys.path.insert(0, os.path.abspath(ML_PATH))
 from sentiment_service import analyse
+from crawler.content_filter import filter_batch
 
 
 class BaseCrawler:
-    def __init__(self, db: Session, platform_id: int, brand_id: int, keywords: list):
+    def __init__(self, db: Session, platform_id: int, brand_id: int, keywords: list, brand_name: str = ""):
         self.db = db
         self.platform_id = platform_id
         self.brand_id = brand_id
         self.keywords = keywords
+        self.brand_name = brand_name or (keywords[0] if keywords else "")
 
     def fetch(self) -> list:
         """Override in subclass. Return list of dicts with keys:
@@ -69,8 +71,12 @@ class BaseCrawler:
         return content
 
     def run(self) -> dict:
-        """Fetch and save all results. Returns summary."""
+        """Fetch, filter, and save all results. Returns summary."""
         items = self.fetch()
+
+        # Apply language + relevance filter
+        items = filter_batch(items, self.brand_name)
+
         saved = 0
         skipped = 0
 

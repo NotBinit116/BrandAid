@@ -1,37 +1,42 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState } from 'react'
+import { authService } from '../services/api'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try {
-      const stored = localStorage.getItem('brandaid_user')
-      return stored ? JSON.parse(stored) : null
+      const raw =
+        localStorage.getItem('brandaid_user') ||
+        sessionStorage.getItem('brandaid_user')
+      return raw ? JSON.parse(raw) : null
     } catch {
       return null
     }
   })
 
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError]     = useState(null)
 
   const login = async (email, password, remember = false) => {
     setLoading(true)
     setError(null)
     try {
-      // Simulate API call
-      await new Promise(r => setTimeout(r, 800))
-      const userData = { id: '1', email, name: email.split('@')[0], role: 'user' }
-      setUser(userData)
-      if (remember) {
-        localStorage.setItem('brandaid_user', JSON.stringify(userData))
-      } else {
-        sessionStorage.setItem('brandaid_user', JSON.stringify(userData))
-      }
+      const res = await authService.login(email, password)
+      const { access_token, user: userData } = res.data
+
+      const stored = { ...userData, token: access_token }
+      setUser(stored)
+
+      const storage = remember ? localStorage : sessionStorage
+      storage.setItem('brandaid_user', JSON.stringify(stored))
+
       return { success: true }
     } catch (err) {
-      setError('Login failed. Please try again.')
-      return { success: false }
+      const msg =
+        err.response?.data?.detail || 'Login failed. Please try again.'
+      setError(msg)
+      return { success: false, error: msg }
     } finally {
       setLoading(false)
     }
@@ -41,11 +46,13 @@ export function AuthProvider({ children }) {
     setLoading(true)
     setError(null)
     try {
-      await new Promise(r => setTimeout(r, 800))
+      await authService.register(email, password)
       return { success: true }
-    } catch {
-      setError('Registration failed. Please try again.')
-      return { success: false }
+    } catch (err) {
+      const msg =
+        err.response?.data?.detail || 'Registration failed. Please try again.'
+      setError(msg)
+      return { success: false, error: msg }
     } finally {
       setLoading(false)
     }
@@ -60,7 +67,9 @@ export function AuthProvider({ children }) {
   const isAuthenticated = !!user
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, register, logout, isAuthenticated }}>
+    <AuthContext.Provider
+      value={{ user, loading, error, login, register, logout, isAuthenticated }}
+    >
       {children}
     </AuthContext.Provider>
   )
@@ -70,4 +79,4 @@ export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used inside AuthProvider')
   return ctx
-}
+} 

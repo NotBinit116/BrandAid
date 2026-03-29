@@ -1,6 +1,5 @@
 """
 Crawler Service — orchestrates all crawlers for a brand.
-Called by the API route or the scheduler.
 """
 import os
 import sys
@@ -16,58 +15,44 @@ from crawler.trustpilot_crawler import TrustpilotCrawler
 from crawler.reddit_crawler import RedditCrawler
 
 
-# Platform name → crawler class mapping
-CRAWLER_MAP = {
-    "YouTube":     YouTubeCrawler,
-    "Reddit":      RedditCrawler,
-    "HackerNews":  HackerNewsCrawler,
-    "Google News": GoogleNewsCrawler,
-    "Trustpilot":  TrustpilotCrawler,
-}
-
-
-def get_platform_id(db: Session, name: str) -> int | None:
+def get_or_create_platform(db: Session, name: str, type: str) -> int:
     platform = db.query(Platform).filter(Platform.name == name).first()
-    return platform.id if platform else None
+    if not platform:
+        platform = Platform(name=name, type=type, enabled=True)
+        db.add(platform)
+        db.commit()
+        db.refresh(platform)
+    return platform.id
 
 
 def run_crawlers_for_brand(db: Session, brand_id: int) -> dict:
-    """
-    Runs all available crawlers for a brand.
-    Fetches keywords from DB, runs each crawler, returns summary.
-    """
-    # Get brand
     brand = db.query(Brand).filter(Brand.id == brand_id).first()
     if not brand:
         return {"error": "Brand not found"}
 
-    # Get monitor keywords for this brand
     keywords = db.query(BrandKeyword).filter(
         BrandKeyword.brand_id == brand_id,
         BrandKeyword.keyword_type == "monitor"
     ).all()
 
-    if not keywords:
-        # Fall back to brand name as keyword
-        keyword_list = [brand.brand_name]
-    else:
-        keyword_list = [kw.keyword for kw in keywords]
+    keyword_list = [kw.keyword for kw in keywords] if keywords else [brand.brand_name]
+    brand_name = brand.brand_name
 
-    print(f"\n[CrawlerService] Running crawlers for brand: {brand.brand_name}")
+    print(f"\n[CrawlerService] Running crawlers for brand: {brand_name}")
     print(f"[CrawlerService] Keywords: {keyword_list}")
 
     summary = {
         "brand_id": brand_id,
-        "brand_name": brand.brand_name,
+        "brand_name": brand_name,
         "keywords": keyword_list,
         "results": {}
     }
 
     # ── YouTube ───────────────────────────────────────────────
-    yt_platform_id = get_platform_id(db, "YouTube")
-    if yt_platform_id and os.getenv("YOUTUBE_API_KEY"):
+    if os.getenv("YOUTUBE_API_KEY"):
+        yt_id = get_or_create_platform(db, "YouTube", "video")
         try:
-            crawler = YouTubeCrawler(db, yt_platform_id, brand_id, keyword_list)
+            crawler = YouTubeCrawler(db, yt_id, brand_id, keyword_list, brand_name)
             result = crawler.run()
             summary["results"]["YouTube"] = result
             print(f"[YouTube] Done — saved: {result['saved']}, skipped: {result['skipped']}")
@@ -75,21 +60,12 @@ def run_crawlers_for_brand(db: Session, brand_id: int) -> dict:
             summary["results"]["YouTube"] = {"error": str(e)}
             print(f"[YouTube] Error: {e}")
     else:
-        summary["results"]["YouTube"] = {"skipped": "No API key or platform not found"}
+        summary["results"]["YouTube"] = {"skipped": "No API key"}
 
     # ── Google News ───────────────────────────────────────────
-    gn_platform_id = get_platform_id(db, "Google News")
-    if not gn_platform_id:
-        # Create it if not seeded
-        from app.models.platform import Platform
-        gn = Platform(name="Google News", type="news", enabled=True)
-        db.add(gn)
-        db.commit()
-        db.refresh(gn)
-        gn_platform_id = gn.id
-
+    gn_id = get_or_create_platform(db, "Google News", "news")
     try:
-        crawler = GoogleNewsCrawler(db, gn_platform_id, brand_id, keyword_list)
+        crawler = GoogleNewsCrawler(db, gn_id, brand_id, keyword_list, brand_name)
         result = crawler.run()
         summary["results"]["Google News"] = result
         print(f"[GoogleNews] Done — saved: {result['saved']}, skipped: {result['skipped']}")
@@ -98,17 +74,9 @@ def run_crawlers_for_brand(db: Session, brand_id: int) -> dict:
         print(f"[GoogleNews] Error: {e}")
 
     # ── Hacker News ───────────────────────────────────────────
-    hn_platform_id = get_platform_id(db, "HackerNews")
-    if not hn_platform_id:
-        from app.models.platform import Platform
-        hn = Platform(name="HackerNews", type="forum", enabled=True)
-        db.add(hn)
-        db.commit()
-        db.refresh(hn)
-        hn_platform_id = hn.id
-
+    hn_id = get_or_create_platform(db, "HackerNews", "forum")
     try:
-        crawler = HackerNewsCrawler(db, hn_platform_id, brand_id, keyword_list)
+        crawler = HackerNewsCrawler(db, hn_id, brand_id, keyword_list, brand_name)
         result = crawler.run()
         summary["results"]["HackerNews"] = result
         print(f"[HackerNews] Done — saved: {result['saved']}, skipped: {result['skipped']}")
@@ -117,17 +85,9 @@ def run_crawlers_for_brand(db: Session, brand_id: int) -> dict:
         print(f"[HackerNews] Error: {e}")
 
     # ── Trustpilot ────────────────────────────────────────────
-    tp_platform_id = get_platform_id(db, "Trustpilot")
-    if not tp_platform_id:
-        from app.models.platform import Platform
-        tp = Platform(name="Trustpilot", type="review", enabled=True)
-        db.add(tp)
-        db.commit()
-        db.refresh(tp)
-        tp_platform_id = tp.id
-
+    tp_id = get_or_create_platform(db, "Trustpilot", "review")
     try:
-        crawler = TrustpilotCrawler(db, tp_platform_id, brand_id, keyword_list)
+        crawler = TrustpilotCrawler(db, tp_id, brand_id, keyword_list, brand_name)
         result = crawler.run()
         summary["results"]["Trustpilot"] = result
         print(f"[Trustpilot] Done — saved: {result['saved']}, skipped: {result['skipped']}")
@@ -135,11 +95,26 @@ def run_crawlers_for_brand(db: Session, brand_id: int) -> dict:
         summary["results"]["Trustpilot"] = {"error": str(e)}
         print(f"[Trustpilot] Error: {e}")
 
-    # ── Reddit (if credentials available) ────────────────────
-    rd_platform_id = get_platform_id(db, "Reddit")
-    if rd_platform_id and os.getenv("REDDIT_CLIENT_ID"):
+    # ── X / Twitter ───────────────────────────────────────────
+    if os.getenv("X_USERNAME"):
+        x_id = get_or_create_platform(db, "X", "social")
         try:
-            crawler = RedditCrawler(db, rd_platform_id, brand_id, keyword_list)
+            from crawler.x_crawler import XCrawler
+            crawler = XCrawler(db, x_id, brand_id, keyword_list, brand_name)
+            result = crawler.run()
+            summary["results"]["X"] = result
+            print(f"[X] Done — saved: {result['saved']}, skipped: {result['skipped']}")
+        except Exception as e:
+            summary["results"]["X"] = {"error": str(e)}
+            print(f"[X] Error: {e}")
+    else:
+        summary["results"]["X"] = {"skipped": "No X credentials"}
+
+    # ── Reddit ────────────────────────────────────────────────
+    if os.getenv("REDDIT_CLIENT_ID"):
+        rd_id = get_or_create_platform(db, "Reddit", "forum")
+        try:
+            crawler = RedditCrawler(db, rd_id, brand_id, keyword_list, brand_name)
             result = crawler.run()
             summary["results"]["Reddit"] = result
             print(f"[Reddit] Done — saved: {result['saved']}, skipped: {result['skipped']}")
@@ -147,7 +122,7 @@ def run_crawlers_for_brand(db: Session, brand_id: int) -> dict:
             summary["results"]["Reddit"] = {"error": str(e)}
             print(f"[Reddit] Error: {e}")
     else:
-        summary["results"]["Reddit"] = {"skipped": "No credentials configured"}
+        summary["results"]["Reddit"] = {"skipped": "No credentials"}
 
     total_saved = sum(
         r.get("saved", 0) for r in summary["results"].values()

@@ -8,82 +8,112 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// ── Request interceptor: attach auth token ──────────────────
+// ── Attach token to every request ────────────────────────────
 api.interceptors.request.use(config => {
-  const user = localStorage.getItem('brandaid_user') || sessionStorage.getItem('brandaid_user')
-  if (user) {
-    const parsed = JSON.parse(user)
-    config.headers.Authorization = `Bearer ${parsed.token || 'mock-token'}`
+  const raw =
+    localStorage.getItem('brandaid_user') ||
+    sessionStorage.getItem('brandaid_user')
+  if (raw) {
+    const parsed = JSON.parse(raw)
+    if (parsed.token) {
+      config.headers.Authorization = `Bearer ${parsed.token}`
+    }
   }
   return config
 })
 
-// ── Mocked service calls ────────────────────────────────────
+// ── Handle 401 globally ──────────────────────────────────────
+api.interceptors.response.use(
+  res => res,
+  err => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('brandaid_user')
+      sessionStorage.removeItem('brandaid_user')
+      window.location.href = '/login'
+    }
+    return Promise.reject(err)
+  }
+)
+
+// ── Auth ─────────────────────────────────────────────────────
 export const authService = {
-  login: async (email, password) => {
-    // TODO: replace with real API call
-    // return api.post('/auth/login', { email, password })
-    await new Promise(r => setTimeout(r, 600))
-    return { data: { user: { id: '1', email, name: email.split('@')[0] }, token: 'mock-token' } }
-  },
+  register: (email, password) =>
+    api.post('/auth/register', { email, password }),
 
-  register: async (name, email, password) => {
-    // TODO: return api.post('/auth/register', { name, email, password })
-    await new Promise(r => setTimeout(r, 600))
-    return { data: { success: true } }
-  },
+  login: (email, password) =>
+    api.post('/auth/login', { email, password }),
 
-  logout: async () => {
-    // TODO: return api.post('/auth/logout')
-    return { data: { success: true } }
-  },
+  me: () =>
+    api.get('/auth/me'),
 }
 
-export const sentimentService = {
-  getSentimentData: async (brand, filters = {}) => {
-    // TODO: return api.get('/sentiment', { params: { brand, ...filters } })
-    await new Promise(r => setTimeout(r, 500))
-    return { data: [] } // will be replaced with real data
-  },
+// ── Brands ───────────────────────────────────────────────────
+export const brandService = {
+  getAll: () =>
+    api.get('/brands/'),
 
-  searchBrand: async (query) => {
-    // TODO: return api.get('/search', { params: { q: query } })
-    await new Promise(r => setTimeout(r, 700))
-    return { data: { query, posts: [] } }
-  },
+  create: (brand_name) =>
+    api.post('/brands/', { brand_name }),
+
+  update: (brand_id, brand_name) =>
+    api.put(`/brands/${brand_id}`, { brand_name }),
+
+  delete: (brand_id) =>
+    api.delete(`/brands/${brand_id}`),
 }
 
-export const reportService = {
-  getReports: async () => {
-    // TODO: return api.get('/reports')
-    await new Promise(r => setTimeout(r, 400))
-    return { data: [] }
-  },
+// ── Content & Sentiment ──────────────────────────────────────
+export const contentService = {
+  getFeed: (brand_id, filters = {}) =>
+    api.get('/content/', {
+      params: {
+        brand_id,
+        platform:   filters.platform   !== 'All' ? filters.platform   : undefined,
+        sentiment:  filters.sentiment  !== 'All' ? filters.sentiment  : undefined,
+        risk_level: filters.riskLevel  !== 'All' ? filters.riskLevel  : undefined,
+        date_from:  filters.dateFrom   || undefined,
+        date_to:    filters.dateTo     || undefined,
+      }
+    }),
 
-  generateReport: async (params) => {
-    // TODO: return api.post('/reports/generate', params)
-    await new Promise(r => setTimeout(r, 1500))
-    return { data: { id: Date.now(), status: 'generated', ...params } }
-  },
-
-  downloadReport: async (id) => {
-    // TODO: return api.get(`/reports/${id}/download`, { responseType: 'blob' })
-    return { data: null }
-  },
+  getMetrics: (brand_id) =>
+    api.get('/content/metrics', { params: { brand_id } }),
 }
 
+// ── Config ───────────────────────────────────────────────────
 export const configService = {
-  getConfig: async () => {
-    // TODO: return api.get('/config')
-    await new Promise(r => setTimeout(r, 300))
-    return { data: {} }
-  },
+  getPlatforms: () =>
+    api.get('/config/platforms'),
 
-  saveConfig: async (config) => {
-    // TODO: return api.put('/config', config)
-    await new Promise(r => setTimeout(r, 600))
-    return { data: { success: true } }
-  },
+  getKeywords: (brand_id) =>
+    api.get(`/config/${brand_id}/keywords`),
+
+  addKeyword: (brand_id, keyword, keyword_type = 'monitor') =>
+    api.post(`/config/${brand_id}/keywords`, { keyword, keyword_type }),
+
+  deleteKeyword: (brand_id, keyword_id) =>
+    api.delete(`/config/${brand_id}/keywords/${keyword_id}`),
+
+  getHandles: (brand_id) =>
+    api.get(`/config/${brand_id}/handles`),
+
+  addHandle: (brand_id, platform_id, handle) =>
+    api.post(`/config/${brand_id}/handles`, { platform_id, handle }),
+
+  deleteHandle: (brand_id, handle_id) =>
+    api.delete(`/config/${brand_id}/handles/${handle_id}`),
+}
+
+// ── Reports ──────────────────────────────────────────────────
+export const reportService = {
+  getAll: () =>
+    api.get('/reports/'),
+
+  create: (data) =>
+    api.post('/reports/', data),
+
+  delete: (report_id) =>
+    api.delete(`/reports/${report_id}`),
 }
 
 export default api

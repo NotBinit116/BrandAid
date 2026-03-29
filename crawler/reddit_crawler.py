@@ -1,12 +1,3 @@
-"""
-Reddit Crawler — fetches posts and comments mentioning the brand.
-Requires Reddit API credentials (PRAW).
-Add to .env:
-    REDDIT_CLIENT_ID=your_client_id
-    REDDIT_CLIENT_SECRET=your_client_secret
-    REDDIT_USERNAME=your_username
-    REDDIT_PASSWORD=your_password
-"""
 import os
 from datetime import datetime
 from crawler.base_crawler import BaseCrawler
@@ -19,14 +10,13 @@ REDDIT_PASSWORD      = os.getenv("REDDIT_PASSWORD", "")
 
 
 class RedditCrawler(BaseCrawler):
-    def __init__(self, db: Session, platform_id: int, brand_id: int, keywords: list):
-        super().__init__(db, platform_id, brand_id, keywords)
+    def __init__(self, db: Session, platform_id: int, brand_id: int, keywords: list, brand_name: str = ""):
+        super().__init__(db, platform_id, brand_id, keywords, brand_name)
         self.reddit = None
         self._init_reddit()
 
     def _init_reddit(self):
         if not REDDIT_CLIENT_ID:
-            print("[Reddit] No credentials found — skipping Reddit crawler")
             return
         try:
             import praw
@@ -43,19 +33,12 @@ class RedditCrawler(BaseCrawler):
 
     def fetch(self) -> list:
         if not self.reddit:
-            print("[Reddit] Skipped — no credentials configured")
             return []
-
         results = []
-
         for keyword in self.keywords:
             print(f"[Reddit] Searching for: {keyword}")
             try:
-                # Search all of Reddit
-                for submission in self.reddit.subreddit("all").search(
-                    keyword, sort="new", limit=25
-                ):
-                    # Add post title + selftext
+                for submission in self.reddit.subreddit("all").search(keyword, sort="new", limit=25):
                     text = f"{submission.title}. {submission.selftext}".strip()
                     if text and len(text) > 10:
                         results.append({
@@ -64,8 +47,6 @@ class RedditCrawler(BaseCrawler):
                             "author": str(submission.author),
                             "created_at": datetime.utcfromtimestamp(submission.created_utc),
                         })
-
-                    # Add top comments
                     submission.comments.replace_more(limit=0)
                     for comment in submission.comments.list()[:10]:
                         if not comment.body or len(comment.body) < 10:
@@ -76,9 +57,7 @@ class RedditCrawler(BaseCrawler):
                             "author": str(comment.author),
                             "created_at": datetime.utcfromtimestamp(comment.created_utc),
                         })
-
             except Exception as e:
                 print(f"[Reddit] Error searching '{keyword}': {e}")
-
         print(f"[Reddit] Total items: {len(results)}")
         return results
