@@ -75,7 +75,7 @@ class BaseCrawler:
         items = self.fetch()
 
         # Apply language + relevance filter
-        items = filter_batch(items, self.brand_name)
+        items = filter_batch(items, self.brand_name, keywords=self.keywords)
 
         saved = 0
         skipped = 0

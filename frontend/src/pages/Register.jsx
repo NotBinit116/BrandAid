@@ -9,17 +9,32 @@ export default function Register() {
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    if (!form.name || !form.email || !form.password || !form.confirm) { setError('Please fill in all fields.'); return }
-    if (form.password !== form.confirm) { setError('Passwords do not match.'); return }
-    if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return }
-    if (!form.terms) { setError('Please agree to the terms of service.'); return }
-    const result = await register(form.name, form.email, form.password)
-    if (result.success) navigate('/login')
-    else setError('Registration failed. Please try again.')
+ const handleSubmit = async (e) => {
+  e.preventDefault()
+  setError('')
+  if (!form.name || !form.email || !form.password || !form.confirm) {
+    setError('Please fill in all fields.')
+    return
   }
+  if (form.password !== form.confirm) {
+    setError('Passwords do not match.')
+    return
+  }
+  if (form.password.length < 6) {
+    setError('Password must be at least 6 characters.')
+    return
+  }
+  if (!form.terms) {
+    setError('Please agree to the terms of service.')
+    return
+  }
+  const result = await register(form.name, form.email, form.password)
+  if (result.success) {
+    navigate('/login')
+  } else {
+    setError(result.error || 'Registration failed. Please try again.')
+  }
+}
 
   const passwordStrength = (p) => {
     if (!p) return 0

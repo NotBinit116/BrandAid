@@ -1,10 +1,4 @@
-"""
-X (Twitter) Crawler — scrapes X for brand mentions using twikit.
-Requires a throwaway X account. Add to .env:
-    X_EMAIL=your@email.com
-    X_USERNAME=yourusername
-    X_PASSWORD=yourpassword
-"""
+
 import os
 import asyncio
 import json
@@ -55,8 +49,8 @@ class XCrawler(BaseCrawler):
             try:
                 print("[X] Logging in...")
                 await client.login(
-                    auth_info_1=X_USERNAME,
-                    auth_info_2=X_EMAIL,
+                    auth_info_1=X_EMAIL,
+                    auth_info_2=X_USERNAME,
                     password=X_PASSWORD,
                 )
                 client.save_cookies(COOKIES_FILE)
