@@ -55,15 +55,17 @@ export default function Dashboard() {
         contentService.getMetrics(activeBrand.id),
       ])
       setPosts(postsRes.data.map(p => ({
-        id: String(p.id),
-        text: p.text,
-        platform: p.platform,
-        date: p.date,
-        sentiment: p.sentiment,
-        riskLevel: p.risk_level,
-        source: p.source_url,
-        author: p.author,
-        score: p.score,
+        id:                String(p.id),
+        text:              p.text,
+        platform:          p.platform,
+        date:              p.date,
+        sentiment:         p.sentiment,
+        riskLevel:         p.risk_level,
+        source:            p.source_url,
+        author:            p.author,
+        score:             p.score,
+        intent:            p.intent,
+        intent_confidence: p.intent_confidence,
       })))
       setMetrics(metricsRes.data)
     } catch { showToast('Failed to load posts', 'error') }
