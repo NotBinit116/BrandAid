@@ -6,11 +6,22 @@ import FeedbackModal from '../components/FeedbackModal'
 import FilterBar from '../components/FilterBar'
 import ReportFlyout from '../components/ReportFlyout'
 import {
-  PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer
+  PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts'
 
-const DEFAULT_FILTERS = { platform: 'All', sentiment: 'All', riskLevel: 'All', dateFrom: '', dateTo: '' }
-const POSTS_PER_PAGE = 10
+const DEFAULT_FILTERS = { platform: 'All', sentiment: 'All', riskLevel: 'All', intent: 'All', dateFrom: '', dateTo: '' }
+const POSTS_PER_PAGE  = 10
+
+const INTENT_COLORS_MAP = {
+  'PR Issue':           '#f97316',
+  'Customer Complaint': '#ef4444',
+  'Product Feedback':   '#3b82f6',
+  'Data Leak':          '#a855f7',
+  'Legal Issue':        '#f43f5e',
+  'Praise':             '#10b981',
+  'General Mention':    '#94a3b8',
+}
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -78,9 +89,9 @@ export default function Dashboard() {
     if (!activeBrand) return
     setCrawling(true)
     try {
-      const raw = localStorage.getItem('brandaid_user') || sessionStorage.getItem('brandaid_user')
+      const raw   = localStorage.getItem('brandaid_user') || sessionStorage.getItem('brandaid_user')
       const token = raw ? JSON.parse(raw).token : ''
-      const res = await fetch(
+      const res   = await fetch(
         `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/crawler/run/${activeBrand.id}/sync`,
         { method: 'POST', headers: { Authorization: `Bearer ${token}` } }
       )
@@ -100,6 +111,12 @@ export default function Dashboard() {
     { name: 'Neutral',  value: metrics.neutral_mentions,  color: '#f59e0b' },
     { name: 'Negative', value: metrics.negative_mentions, color: '#ef4444' },
   ] : []
+
+  const INTENT_BAR_DATA = metrics?.intents
+    ? Object.entries(metrics.intents)
+        .map(([name, value]) => ({ name, value, fill: INTENT_COLORS_MAP[name] || '#94a3b8' }))
+        .sort((a, b) => b.value - a.value)
+    : []
 
   const score = metrics && metrics.total_mentions > 0
     ? Math.round((metrics.positive_mentions / metrics.total_mentions) * 100)
@@ -141,11 +158,10 @@ export default function Dashboard() {
               </select>
             )}
             <button onClick={handleCrawl} disabled={crawling || !activeBrand} className="btn-secondary flex items-center gap-2 disabled:opacity-60">
-              {crawling ? (
-                <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>Fetching…</>
-              ) : (
-                <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M13 1v4H9M1 13V9H5M13 5A6 6 0 0 1 2.1 9.5M1 9a6 6 0 0 1 10.9-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>Fetch Mentions</>
-              )}
+              {crawling
+                ? <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>Fetching…</>
+                : <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M13 1v4H9M1 13V9H5M13 5A6 6 0 0 1 2.1 9.5M1 9a6 6 0 0 1 10.9-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>Fetch Mentions</>
+              }
             </button>
             <button onClick={() => setFlyoutOpen(true)} className="btn-primary flex items-center gap-2">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M1 11v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -183,10 +199,12 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Charts */}
+            {/* Charts row */}
             {metrics && metrics.total_mentions > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-                <div className="lg:col-span-2 card">
+
+                {/* Sentiment Pie */}
+                <div className="card">
                   <h2 className="font-display font-semibold text-slate-900 mb-4">Sentiment Split</h2>
                   <ResponsiveContainer width="100%" height={200}>
                     <PieChart>
@@ -198,6 +216,8 @@ export default function Dashboard() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
+
+                {/* Brand Health */}
                 <div className="card flex flex-col justify-center gap-3">
                   <h2 className="font-display font-semibold text-slate-900">Brand Health</h2>
                   <div className="text-center py-4">
@@ -214,6 +234,37 @@ export default function Dashboard() {
                   </div>
                   <p className="text-xs text-slate-400 text-center">{metrics.total_mentions.toLocaleString()} total mentions</p>
                 </div>
+
+                {/* Intent Bar Chart */}
+                {INTENT_BAR_DATA.length > 0 && (
+                  <div className="card">
+                    <h2 className="font-display font-semibold text-slate-900 mb-4">Intent Breakdown</h2>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={INTENT_BAR_DATA} layout="vertical" margin={{ left: 0, right: 10, top: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          tick={{ fontSize: 9, fill: '#64748b' }}
+                          tickLine={false}
+                          axisLine={false}
+                          width={100}
+                          tickFormatter={v => v.length > 12 ? v.slice(0, 12) + '…' : v}
+                        />
+                        <Tooltip
+                          contentStyle={{ borderRadius: '12px', fontSize: '12px', border: '1px solid #e2e8f0' }}
+                          formatter={v => [v, 'mentions']}
+                        />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                          {INTENT_BAR_DATA.map((entry, index) => (
+                            <Cell key={index} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </div>
             )}
 
@@ -263,17 +314,13 @@ export default function Dashboard() {
                   )
                   return (
                     <div key={key} className="flex flex-col gap-3">
-                      <SentimentColumn
-                        sentiment={key}
-                        posts={paginated}
-                        onPostClick={setSelectedPost}
-                      />
+                      <SentimentColumn sentiment={key} posts={paginated} onPostClick={setSelectedPost} />
                       {totalPages > 1 && (
                         <div className="flex items-center justify-between px-1">
                           <button
                             onClick={() => setPage(p => ({ ...p, [key]: Math.max(1, p[key] - 1) }))}
                             disabled={currentPage === 1}
-                            className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-2 py-1.5 rounded-lg hover:bg-slate-100"
+                            className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1.5 rounded-lg hover:bg-slate-100"
                           >
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                               <path d="M8.5 3L5 7l3.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -281,13 +328,12 @@ export default function Dashboard() {
                             Prev
                           </button>
                           <span className="text-xs text-slate-400">
-                            {currentPage} / {totalPages}
-                            <span className="ml-1 text-slate-300">({colPosts.length})</span>
+                            {currentPage} / {totalPages} <span className="text-slate-300">({colPosts.length})</span>
                           </span>
                           <button
                             onClick={() => setPage(p => ({ ...p, [key]: Math.min(totalPages, p[key] + 1) }))}
                             disabled={currentPage === totalPages}
-                            className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-2 py-1.5 rounded-lg hover:bg-slate-100"
+                            className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1.5 rounded-lg hover:bg-slate-100"
                           >
                             Next
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

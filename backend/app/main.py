@@ -1,9 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database.connection import engine, Base
-from app.routes import auth, brands, config, reports, content, sentiment, crawler, search
+from app.routes import auth, brands, config, reports, content, sentiment, crawler, search, authors, admin
 
 import app.models  # noqa
+from app.models import author_flag  # noqa
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -14,10 +15,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-    ],
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,6 +29,8 @@ app.include_router(content.router,   prefix="/content",   tags=["Content"])
 app.include_router(sentiment.router, prefix="/sentiment", tags=["Sentiment"])
 app.include_router(crawler.router,   prefix="/crawler",   tags=["Crawler"])
 app.include_router(search.router,    prefix="/public",    tags=["Public"])
+app.include_router(authors.router,   prefix="/authors",   tags=["Authors"])
+app.include_router(admin.router,     prefix="/admin",     tags=["Admin"])
 
 
 @app.get("/")
