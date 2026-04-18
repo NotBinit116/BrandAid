@@ -1,7 +1,3 @@
-"""
-Base crawler — handles deduplication, filtering,
-sentiment, intent classification, account filtering, and DB saving.
-"""
 import sys
 import os
 from datetime import datetime
@@ -11,7 +7,7 @@ ML_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "ml")
 sys.path.insert(0, os.path.abspath(ML_PATH))
 
 from sentiment_service import analyse
-from crawler.content_filter import filter_batch
+from crawler.content_filter import filter_batch, get_blocklist_words
 
 
 class BaseCrawler:
@@ -29,9 +25,9 @@ class BaseCrawler:
         from app.models.content import Content
         from app.models.sentiment import Sentiment
         from app.models.platform import Platform
+        from app.models.keyword import BrandKeyword
         from app.services.account_filter import update_author_stats
 
-        # Dedup
         existing = self.db.query(Content).filter(
             Content.source_url == item.get("source_url"),
             Content.brand_id   == self.brand_id
@@ -53,18 +49,15 @@ class BaseCrawler:
 
         text = item.get("text", "")
 
-        # Sentiment
-        from app.models.keyword import BrandKeyword
+        # Risk keywords
         risk_kws = self.db.query(BrandKeyword).filter(
-            BrandKeyword.brand_id    == self.brand_id,
+            BrandKeyword.brand_id     == self.brand_id,
             BrandKeyword.keyword_type == "risk"
         ).all()
         risk_keyword_list = [kw.keyword for kw in risk_kws]
 
-        # Sentiment — with risk keyword override
         sentiment_result = analyse(text, risk_keywords=risk_keyword_list)
 
-        # Intent
         intent_result = {"intent": "General Mention", "confidence": 0.5}
         try:
             from intent_classifier import classify_intent
@@ -72,8 +65,7 @@ class BaseCrawler:
         except Exception as e:
             print(f"[BaseCrawler] Intent error: {e}")
 
-        # Get platform name
-        platform = self.db.query(Platform).filter(Platform.id == self.platform_id).first()
+        platform      = self.db.query(Platform).filter(Platform.id == self.platform_id).first()
         platform_name = platform.name if platform else "Unknown"
 
         sentiment_row = Sentiment(
@@ -88,7 +80,6 @@ class BaseCrawler:
         self.db.add(sentiment_row)
         self.db.commit()
 
-        # Account filtering — track author sentiment
         try:
             update_author_stats(
                 db        = self.db,
@@ -103,16 +94,31 @@ class BaseCrawler:
         return content
 
     def run(self) -> dict:
-        items   = self.fetch()
-        items   = filter_batch(items, self.brand_name, keywords=self.keywords)
-        saved   = 0
-        skipped = 0
+        from app.models.keyword import BrandKeyword
+
+        items = self.fetch()
+
+        exclude_kws = self.db.query(BrandKeyword).filter(
+            BrandKeyword.brand_id     == self.brand_id,
+            BrandKeyword.keyword_type == "exclude"
+        ).all()
+        extra_blocklist = [kw.keyword for kw in exclude_kws]
+        blocklist_words = get_blocklist_words(self.brand_name, extra_blocklist)
+
+        items = filter_batch(
+            items, self.brand_name,
+            keywords        = self.keywords,
+            blocklist_words = blocklist_words,
+        )
+
+        saved = skipped = 0
         for item in items:
             result = self.save_content(item)
             if result:
                 saved += 1
             else:
                 skipped += 1
+
         return {
             "platform_id": self.platform_id,
             "fetched":     len(items),

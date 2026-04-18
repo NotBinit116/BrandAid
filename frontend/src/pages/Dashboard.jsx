@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { brandService, contentService } from '../services/api'
+import { brandService, contentService, authorService } from '../services/api'
 import SentimentColumn from '../components/SentimentColumn'
 import FeedbackModal from '../components/FeedbackModal'
 import FilterBar from '../components/FilterBar'
@@ -25,24 +25,26 @@ const INTENT_COLORS_MAP = {
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const [brands, setBrands]             = useState([])
-  const [activeBrand, setActiveBrand]   = useState(null)
-  const [posts, setPosts]               = useState([])
-  const [metrics, setMetrics]           = useState(null)
-  const [filters, setFilters]           = useState(DEFAULT_FILTERS)
-  const [selectedPost, setSelectedPost] = useState(null)
-  const [flyoutOpen, setFlyoutOpen]     = useState(false)
-  const [toast, setToast]               = useState(null)
+  const [brands, setBrands]               = useState([])
+  const [activeBrand, setActiveBrand]     = useState(null)
+  const [posts, setPosts]                 = useState([])
+  const [metrics, setMetrics]             = useState(null)
+  const [filters, setFilters]             = useState(DEFAULT_FILTERS)
+  const [selectedPost, setSelectedPost]   = useState(null)
+  const [flyoutOpen, setFlyoutOpen]       = useState(false)
+  const [toast, setToast]                 = useState(null)
   const [loadingBrands, setLoadingBrands] = useState(true)
   const [loadingPosts, setLoadingPosts]   = useState(false)
   const [crawling, setCrawling]           = useState(false)
   const [page, setPage]                   = useState({ positive: 1, neutral: 1, negative: 1 })
+  const [flaggedAuthors, setFlaggedAuthors] = useState([])
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3500)
   }
 
+  // Load brands
   useEffect(() => {
     const load = async () => {
       setLoadingBrands(true)
@@ -56,6 +58,15 @@ export default function Dashboard() {
     load()
   }, [])
 
+  // Load flagged authors when brand changes
+  useEffect(() => {
+    if (!activeBrand) return
+    authorService.getFlagged(activeBrand.id)
+      .then(res => setFlaggedAuthors(res.data.map(a => a.author)))
+      .catch(() => {})
+  }, [activeBrand])
+
+  // Load posts + metrics
   const loadPosts = useCallback(async () => {
     if (!activeBrand) return
     setPage({ positive: 1, neutral: 1, negative: 1 })
@@ -85,6 +96,7 @@ export default function Dashboard() {
 
   useEffect(() => { loadPosts() }, [loadPosts])
 
+  // Crawl
   const handleCrawl = async () => {
     if (!activeBrand) return
     setCrawling(true)
@@ -149,11 +161,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             {brands.length > 1 && (
-              <select
-                value={activeBrand?.id || ''}
-                onChange={e => setActiveBrand(brands.find(b => b.id === Number(e.target.value)))}
-                className="input-field text-sm py-2 w-auto"
-              >
+              <select value={activeBrand?.id || ''} onChange={e => setActiveBrand(brands.find(b => b.id === Number(e.target.value)))} className="input-field text-sm py-2 w-auto">
                 {brands.map(b => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
               </select>
             )}
@@ -181,6 +189,21 @@ export default function Dashboard() {
 
         {!loadingBrands && activeBrand && (
           <>
+            {/* Flagged authors alert */}
+            {flaggedAuthors.length > 0 && (
+              <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-5 py-3 animate-fade-in">
+                <span className="text-orange-500 text-xl">🚩</span>
+                <div>
+                  <p className="text-sm font-semibold text-orange-700">
+                    {flaggedAuthors.length} flagged author{flaggedAuthors.length > 1 ? 's' : ''} detected
+                  </p>
+                  <p className="text-xs text-orange-500">
+                    These authors consistently post negative content. Posts from flagged authors are marked with 🚩
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Metrics */}
             {metrics && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
@@ -199,11 +222,9 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Charts row */}
+            {/* Charts */}
             {metrics && metrics.total_mentions > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-
-                {/* Sentiment Pie */}
                 <div className="card">
                   <h2 className="font-display font-semibold text-slate-900 mb-4">Sentiment Split</h2>
                   <ResponsiveContainer width="100%" height={200}>
@@ -217,25 +238,18 @@ export default function Dashboard() {
                   </ResponsiveContainer>
                 </div>
 
-                {/* Brand Health */}
                 <div className="card flex flex-col justify-center gap-3">
                   <h2 className="font-display font-semibold text-slate-900">Brand Health</h2>
                   <div className="text-center py-4">
-                    <p className={`font-display font-bold text-5xl ${score >= 60 ? 'text-emerald-500' : score >= 40 ? 'text-amber-500' : 'text-red-500'}`}>
-                      {score}%
-                    </p>
+                    <p className={`font-display font-bold text-5xl ${score >= 60 ? 'text-emerald-500' : score >= 40 ? 'text-amber-500' : 'text-red-500'}`}>{score}%</p>
                     <p className="text-sm text-slate-500 mt-1">Positive sentiment rate</p>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-2.5">
-                    <div
-                      className={`h-2.5 rounded-full transition-all duration-500 ${score >= 60 ? 'bg-emerald-400' : score >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
-                      style={{ width: `${score}%` }}
-                    />
+                    <div className={`h-2.5 rounded-full transition-all duration-500 ${score >= 60 ? 'bg-emerald-400' : score >= 40 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${score}%` }} />
                   </div>
                   <p className="text-xs text-slate-400 text-center">{metrics.total_mentions.toLocaleString()} total mentions</p>
                 </div>
 
-                {/* Intent Bar Chart */}
                 {INTENT_BAR_DATA.length > 0 && (
                   <div className="card">
                     <h2 className="font-display font-semibold text-slate-900 mb-4">Intent Breakdown</h2>
@@ -243,23 +257,11 @@ export default function Dashboard() {
                       <BarChart data={INTENT_BAR_DATA} layout="vertical" margin={{ left: 0, right: 10, top: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                         <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                        <YAxis
-                          type="category"
-                          dataKey="name"
-                          tick={{ fontSize: 9, fill: '#64748b' }}
-                          tickLine={false}
-                          axisLine={false}
-                          width={100}
-                          tickFormatter={v => v.length > 12 ? v.slice(0, 12) + '…' : v}
-                        />
-                        <Tooltip
-                          contentStyle={{ borderRadius: '12px', fontSize: '12px', border: '1px solid #e2e8f0' }}
-                          formatter={v => [v, 'mentions']}
-                        />
+                        <YAxis type="category" dataKey="name" tick={{ fontSize: 9, fill: '#64748b' }} tickLine={false} axisLine={false} width={100}
+                          tickFormatter={v => v.length > 12 ? v.slice(0, 12) + '…' : v} />
+                        <Tooltip contentStyle={{ borderRadius: '12px', fontSize: '12px', border: '1px solid #e2e8f0' }} formatter={v => [v, 'mentions']} />
                         <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                          {INTENT_BAR_DATA.map((entry, index) => (
-                            <Cell key={index} fill={entry.fill} />
-                          ))}
+                          {INTENT_BAR_DATA.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
@@ -289,9 +291,7 @@ export default function Dashboard() {
               <div className="card text-center py-16">
                 <div className="text-4xl mb-3">🔍</div>
                 <h3 className="font-display font-semibold text-slate-800 mb-2">No mentions found</h3>
-                <p className="text-slate-500 text-sm mb-5">
-                  Click "Fetch Mentions" to crawl for brand mentions, or adjust your filters.
-                </p>
+                <p className="text-slate-500 text-sm mb-5">Click "Fetch Mentions" to crawl for brand mentions, or adjust your filters.</p>
                 <button onClick={handleCrawl} disabled={crawling} className="btn-primary">
                   {crawling ? 'Fetching…' : 'Fetch Mentions Now'}
                 </button>
@@ -308,13 +308,15 @@ export default function Dashboard() {
                 ].map(({ key, colPosts }) => {
                   const currentPage = page[key]
                   const totalPages  = Math.ceil(colPosts.length / POSTS_PER_PAGE)
-                  const paginated   = colPosts.slice(
-                    (currentPage - 1) * POSTS_PER_PAGE,
-                    currentPage * POSTS_PER_PAGE
-                  )
+                  const paginated   = colPosts.slice((currentPage - 1) * POSTS_PER_PAGE, currentPage * POSTS_PER_PAGE)
                   return (
                     <div key={key} className="flex flex-col gap-3">
-                      <SentimentColumn sentiment={key} posts={paginated} onPostClick={setSelectedPost} />
+                      <SentimentColumn
+                        sentiment={key}
+                        posts={paginated}
+                        onPostClick={setSelectedPost}
+                        flaggedAuthors={flaggedAuthors}
+                      />
                       {totalPages > 1 && (
                         <div className="flex items-center justify-between px-1">
                           <button
@@ -322,23 +324,17 @@ export default function Dashboard() {
                             disabled={currentPage === 1}
                             className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1.5 rounded-lg hover:bg-slate-100"
                           >
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                              <path d="M8.5 3L5 7l3.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L5 7l3.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                             Prev
                           </button>
-                          <span className="text-xs text-slate-400">
-                            {currentPage} / {totalPages} <span className="text-slate-300">({colPosts.length})</span>
-                          </span>
+                          <span className="text-xs text-slate-400">{currentPage} / {totalPages} <span className="text-slate-300">({colPosts.length})</span></span>
                           <button
                             onClick={() => setPage(p => ({ ...p, [key]: Math.min(totalPages, p[key] + 1) }))}
                             disabled={currentPage === totalPages}
                             className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1.5 rounded-lg hover:bg-slate-100"
                           >
                             Next
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                              <path d="M5.5 3L9 7l-3.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5.5 3L9 7l-3.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                           </button>
                         </div>
                       )}
@@ -356,6 +352,7 @@ export default function Dashboard() {
           post={selectedPost}
           onClose={() => setSelectedPost(null)}
           onReport={() => showToast('Post reported successfully')}
+          flaggedAuthors={flaggedAuthors}
         />
       )}
 
@@ -369,10 +366,7 @@ export default function Dashboard() {
 
       {toast && (
         <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-xl text-sm font-semibold flex items-center gap-2 animate-slide-in-up ${toast.type === 'error' ? 'bg-red-600' : 'bg-emerald-600'} text-white`}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <circle cx="7" cy="7" r="6" stroke="white" strokeWidth="1.4"/>
-            <path d="M4.5 7l2 2 3-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="white" strokeWidth="1.4"/><path d="M4.5 7l2 2 3-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
           {toast.msg}
         </div>
       )}

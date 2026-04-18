@@ -2,36 +2,40 @@ import PostCard from './PostCard'
 
 const COLUMN_CONFIG = {
   positive: {
-    label: 'Positive',
-    emoji: '😊',
-    dotColor: 'bg-emerald-500',
-    headerBg: 'bg-emerald-50 border-emerald-200',
+    label: 'Positive', emoji: '😊',
+    dotColor:   'bg-emerald-500',
+    headerBg:   'bg-emerald-50 border-emerald-200',
     headerText: 'text-emerald-700',
-    countBg: 'bg-emerald-100 text-emerald-700',
-    emptyText: 'No positive mentions found.',
+    countBg:    'bg-emerald-100 text-emerald-700',
+    emptyText:  'No positive mentions found.',
   },
   neutral: {
-    label: 'Neutral',
-    emoji: '😐',
-    dotColor: 'bg-amber-400',
-    headerBg: 'bg-amber-50 border-amber-200',
+    label: 'Neutral', emoji: '😐',
+    dotColor:   'bg-amber-400',
+    headerBg:   'bg-amber-50 border-amber-200',
     headerText: 'text-amber-700',
-    countBg: 'bg-amber-100 text-amber-700',
-    emptyText: 'No neutral mentions found.',
+    countBg:    'bg-amber-100 text-amber-700',
+    emptyText:  'No neutral mentions found.',
   },
   negative: {
-    label: 'Negative',
-    emoji: '😞',
-    dotColor: 'bg-red-500',
-    headerBg: 'bg-red-50 border-red-200',
+    label: 'Negative', emoji: '😞',
+    dotColor:   'bg-red-500',
+    headerBg:   'bg-red-50 border-red-200',
     headerText: 'text-red-700',
-    countBg: 'bg-red-100 text-red-700',
-    emptyText: 'No negative mentions found.',
+    countBg:    'bg-red-100 text-red-700',
+    emptyText:  'No negative mentions found.',
   },
 }
 
-export default function SentimentColumn({ sentiment, posts, onPostClick, onViewMore, maxVisible = 5 }) {
-  const cfg = COLUMN_CONFIG[sentiment]
+export default function SentimentColumn({
+  sentiment,
+  posts,
+  onPostClick,
+  onViewMore,
+  maxVisible = 5,
+  flaggedAuthors = [],
+}) {
+  const cfg     = COLUMN_CONFIG[sentiment]
   const visible = posts.slice(0, maxVisible)
 
   return (
@@ -57,7 +61,12 @@ export default function SentimentColumn({ sentiment, posts, onPostClick, onViewM
           </div>
         ) : (
           visible.map(post => (
-            <PostCard key={post.id} post={post} onClick={onPostClick} />
+            <PostCard
+              key={post.id}
+              post={post}
+              onClick={onPostClick}
+              flaggedAuthors={flaggedAuthors}
+            />
           ))
         )}
       </div>

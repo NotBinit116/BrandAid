@@ -133,7 +133,7 @@ const DEFAULT_INSTRUCTIONS = {
   tip: 'Most platforms have a report option in the post menu',
 }
 
-export default function FeedbackModal({ post, onClose, onReport }) {
+export default function FeedbackModal({ post, onClose, onReport, flaggedAuthors = [] }) {
   const [showReportPanel, setShowReportPanel] = useState(false)
   const [opened, setOpened]                   = useState(false)
 
@@ -156,18 +156,16 @@ export default function FeedbackModal({ post, onClose, onReport }) {
     high:   { label: 'High Risk',   cls: 'badge-risk-high'   },
   }
 
-  const s           = sentimentMap[post.sentiment] || sentimentMap.neutral
-  const r           = riskMap[post.riskLevel]      || riskMap.low
-  const intentColor = INTENT_COLORS[post.intent]   || INTENT_COLORS['General Mention']
-  const intentIcon  = INTENT_ICONS[post.intent]    || '📰'
-  const isHighRisk  = post.riskLevel === 'high'
-  const instructions = PLATFORM_REPORT_INSTRUCTIONS[post.platform] || DEFAULT_INSTRUCTIONS
+  const s               = sentimentMap[post.sentiment] || sentimentMap.neutral
+  const r               = riskMap[post.riskLevel]      || riskMap.low
+  const intentColor     = INTENT_COLORS[post.intent]   || INTENT_COLORS['General Mention']
+  const intentIcon      = INTENT_ICONS[post.intent]    || '📰'
+  const isHighRisk      = post.riskLevel === 'high'
+  const isFlaggedAuthor = post.author && flaggedAuthors.includes(post.author)
+  const instructions    = PLATFORM_REPORT_INSTRUCTIONS[post.platform] || DEFAULT_INSTRUCTIONS
 
   const handleOpenReport = () => {
-    // Open source in new tab
-    if (post.source) {
-      window.open(post.source, '_blank', 'noopener,noreferrer')
-    }
+    if (post.source) window.open(post.source, '_blank', 'noopener,noreferrer')
     setOpened(true)
     setShowReportPanel(true)
     onReport && onReport(post)
@@ -178,7 +176,6 @@ export default function FeedbackModal({ post, onClose, onReport }) {
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl animate-scale-in overflow-hidden">
-        {/* Top accent */}
         <div className={`h-1 w-full ${
           post.sentiment === 'positive' ? 'bg-emerald-400' :
           post.sentiment === 'negative' ? 'bg-red-400' : 'bg-amber-400'
@@ -188,11 +185,24 @@ export default function FeedbackModal({ post, onClose, onReport }) {
 
           {/* High risk banner */}
           {isHighRisk && (
-            <div className="mb-4 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 animate-fade-in">
+            <div className="mb-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
               <span className="text-red-500 text-lg">⚠</span>
               <div>
                 <p className="text-sm font-semibold text-red-700">High Risk Post</p>
                 <p className="text-xs text-red-500">This post has been flagged as potentially harmful to brand reputation.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Flagged author banner */}
+          {isFlaggedAuthor && (
+            <div className="mb-3 flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+              <span className="text-orange-500 text-lg">🚩</span>
+              <div>
+                <p className="text-sm font-semibold text-orange-700">Flagged Author</p>
+                <p className="text-xs text-orange-500">
+                  <span className="font-medium">{post.author}</span> has been flagged for consistently posting negative content.
+                </p>
               </div>
             </div>
           )}
@@ -214,10 +224,9 @@ export default function FeedbackModal({ post, onClose, onReport }) {
             </button>
           </div>
 
-          {/* ── Detail view ─────────────────────────────────── */}
+          {/* ── Detail view ──────────────────────────────── */}
           {!showReportPanel && (
             <>
-              {/* Badges */}
               <div className="flex flex-wrap gap-2 mb-4">
                 <span className={s.cls}>{s.label}</span>
                 <span className={r.cls}>{r.label}</span>
@@ -240,15 +249,14 @@ export default function FeedbackModal({ post, onClose, onReport }) {
               {post.author && (
                 <p className="text-xs text-slate-400 mb-2">
                   by <span className="font-medium text-slate-600">{post.author}</span>
+                  {isFlaggedAuthor && <span className="ml-1.5 text-orange-500 font-semibold">🚩 Flagged</span>}
                 </p>
               )}
 
-              {/* Post text */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-5">
                 <p className="text-sm text-slate-700 leading-relaxed">{post.text}</p>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-3">
                 <button
                   onClick={handleOpenReport}
@@ -277,10 +285,9 @@ export default function FeedbackModal({ post, onClose, onReport }) {
             </>
           )}
 
-          {/* ── Report instructions panel ────────────────────── */}
+          {/* ── Report instructions ──────────────────────── */}
           {showReportPanel && (
             <div className="animate-fade-in">
-              {/* Opened confirmation */}
               {opened && (
                 <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-4 text-sm text-emerald-700 font-medium">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.4"/><path d="M4.5 7l2 2 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -288,7 +295,6 @@ export default function FeedbackModal({ post, onClose, onReport }) {
                 </div>
               )}
 
-              {/* Platform instructions */}
               <div className={`border rounded-xl p-4 mb-4 ${instructions.color}`}>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-xl">{instructions.icon}</span>
@@ -314,16 +320,12 @@ export default function FeedbackModal({ post, onClose, onReport }) {
                 )}
               </div>
 
-              {/* Post reference */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4">
                 <p className="text-xs text-slate-400 mb-1">Post being reported:</p>
                 <p className="text-xs text-slate-600 line-clamp-2">{post.text}</p>
-                {post.author && (
-                  <p className="text-xs text-slate-400 mt-1">by {post.author}</p>
-                )}
+                {post.author && <p className="text-xs text-slate-400 mt-1">by {post.author}</p>}
               </div>
 
-              {/* Actions */}
               <div className="flex gap-3">
                 <a
                   href={post.source}
