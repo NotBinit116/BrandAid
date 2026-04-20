@@ -27,7 +27,9 @@ class BaseCrawler:
         from app.models.platform import Platform
         from app.models.keyword import BrandKeyword
         from app.services.account_filter import update_author_stats
+        from app.services.arbitration import arbitrate
 
+        # Dedup
         existing = self.db.query(Content).filter(
             Content.source_url == item.get("source_url"),
             Content.brand_id   == self.brand_id
@@ -49,15 +51,17 @@ class BaseCrawler:
 
         text = item.get("text", "")
 
-        # Risk keywords
+        # Load risk keywords
         risk_kws = self.db.query(BrandKeyword).filter(
             BrandKeyword.brand_id     == self.brand_id,
             BrandKeyword.keyword_type == "risk"
         ).all()
         risk_keyword_list = [kw.keyword for kw in risk_kws]
 
+        # Sentiment analysis
         sentiment_result = analyse(text, risk_keywords=risk_keyword_list)
 
+        # Intent classification
         intent_result = {"intent": "General Mention", "confidence": 0.5}
         try:
             from intent_classifier import classify_intent
@@ -65,14 +69,24 @@ class BaseCrawler:
         except Exception as e:
             print(f"[BaseCrawler] Intent error: {e}")
 
+        # ── Arbitration: fix sentiment/intent mismatches ──────
+        arbitrated = arbitrate(
+            sentiment         = sentiment_result["sentiment"],
+            sentiment_score   = sentiment_result["score"],
+            risk_level        = sentiment_result["risk_level"],
+            intent            = intent_result.get("intent", "General Mention"),
+            intent_confidence = intent_result.get("confidence", 0.5),
+        )
+
+        # Platform name for account filter
         platform      = self.db.query(Platform).filter(Platform.id == self.platform_id).first()
         platform_name = platform.name if platform else "Unknown"
 
         sentiment_row = Sentiment(
             content_id        = content.id,
-            sentiment         = sentiment_result["sentiment"],
-            score             = sentiment_result["score"],
-            risk_level        = sentiment_result["risk_level"],
+            sentiment         = arbitrated["sentiment"],
+            score             = arbitrated["score"],
+            risk_level        = arbitrated["risk_level"],
             intent            = intent_result.get("intent", "General Mention"),
             intent_confidence = intent_result.get("confidence", 0.5),
             analyzed_at       = datetime.utcnow(),
@@ -80,13 +94,14 @@ class BaseCrawler:
         self.db.add(sentiment_row)
         self.db.commit()
 
+        # Account filtering
         try:
             update_author_stats(
                 db        = self.db,
                 brand_id  = self.brand_id,
                 author    = item.get("author", ""),
                 platform  = platform_name,
-                sentiment = sentiment_result["sentiment"],
+                sentiment = arbitrated["sentiment"],
             )
         except Exception as e:
             print(f"[BaseCrawler] Account filter error: {e}")
@@ -98,16 +113,21 @@ class BaseCrawler:
 
         items = self.fetch()
 
-        exclude_kws = self.db.query(BrandKeyword).filter(
+        # Load exclude keywords for blocklist
+        exclude_kws     = self.db.query(BrandKeyword).filter(
             BrandKeyword.brand_id     == self.brand_id,
             BrandKeyword.keyword_type == "exclude"
         ).all()
         extra_blocklist = [kw.keyword for kw in exclude_kws]
         blocklist_words = get_blocklist_words(self.brand_name, extra_blocklist)
 
+        # Load handle keywords for additional search terms
+        handle_keywords = self._get_handle_keywords()
+        all_keywords    = list(set(self.keywords + handle_keywords))
+
         items = filter_batch(
             items, self.brand_name,
-            keywords        = self.keywords,
+            keywords        = all_keywords,
             blocklist_words = blocklist_words,
         )
 
@@ -125,3 +145,24 @@ class BaseCrawler:
             "saved":       saved,
             "skipped":     skipped,
         }
+
+    def _get_handle_keywords(self) -> list:
+        """Load social media handles as additional search keywords."""
+        try:
+            from app.models.handle import BrandHandle
+            from app.models.platform import Platform as PlatformModel
+
+            handles = self.db.query(BrandHandle).filter(
+                BrandHandle.brand_id == self.brand_id
+            ).all()
+
+            keywords = []
+            for handle in handles:
+                if handle.handle:
+                    # Add handle as-is and without @ symbol
+                    keywords.append(handle.handle)
+                    if handle.handle.startswith('@'):
+                        keywords.append(handle.handle[1:])
+            return keywords
+        except Exception:
+            return []

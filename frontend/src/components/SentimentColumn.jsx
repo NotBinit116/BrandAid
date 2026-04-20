@@ -29,18 +29,17 @@ const COLUMN_CONFIG = {
 
 export default function SentimentColumn({
   sentiment,
-  posts,
+  posts,         // already paginated — do NOT slice again
+  totalCount,    // total unsliced count for header badge
   onPostClick,
   onViewMore,
-  maxVisible = 5,
   flaggedAuthors = [],
 }) {
-  const cfg     = COLUMN_CONFIG[sentiment]
-  const visible = posts.slice(0, maxVisible)
+  const cfg = COLUMN_CONFIG[sentiment]
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Column header */}
+      {/* Header */}
       <div className={`flex items-center justify-between px-4 py-3 rounded-xl border ${cfg.headerBg}`}>
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${cfg.dotColor}`} />
@@ -48,19 +47,20 @@ export default function SentimentColumn({
             {cfg.emoji} {cfg.label}
           </span>
         </div>
+        {/* Show total count, not paginated count */}
         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cfg.countBg}`}>
-          {posts.length}
+          {totalCount ?? posts.length}
         </span>
       </div>
 
-      {/* Cards */}
+      {/* Cards — no slicing, Dashboard controls what arrives here */}
       <div className="flex flex-col gap-2.5">
-        {visible.length === 0 ? (
+        {posts.length === 0 ? (
           <div className="text-center py-10 text-slate-400 text-sm">
             {cfg.emptyText}
           </div>
         ) : (
-          visible.map(post => (
+          posts.map(post => (
             <PostCard
               key={post.id}
               post={post}
@@ -71,13 +71,13 @@ export default function SentimentColumn({
         )}
       </div>
 
-      {/* View More */}
-      {posts.length > maxVisible && onViewMore && (
+      {/* View More (guest preview only) */}
+      {onViewMore && (
         <button
           onClick={onViewMore}
-          className={`w-full py-2.5 rounded-xl border text-sm font-semibold transition-all duration-200 ${cfg.headerBg} ${cfg.headerText} hover:opacity-80 border-dashed`}
+          className={`w-full py-2.5 rounded-xl border text-sm font-semibold transition-all ${cfg.headerBg} ${cfg.headerText} hover:opacity-80 border-dashed`}
         >
-          View {posts.length - maxVisible} more
+          View more
         </button>
       )}
     </div>

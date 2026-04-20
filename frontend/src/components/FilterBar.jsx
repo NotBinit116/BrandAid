@@ -1,4 +1,5 @@
-import { PLATFORMS } from '../data/dummyData'
+import { useState, useEffect } from 'react'
+import { configService } from '../services/api'
 
 const INTENTS = [
   'PR Issue',
@@ -21,6 +22,17 @@ const INTENT_COLORS = {
 }
 
 export default function FilterBar({ filters, onChange, onReset }) {
+  const [platforms, setPlatforms] = useState([])
+
+  // Load real platforms from DB
+  useEffect(() => {
+    configService.getPlatforms()
+      .then(res => setPlatforms(res.data.map(p => p.name)))
+      .catch(() => setPlatforms([
+        'YouTube', 'Google News', 'HackerNews', 'Trustpilot', 'Reddit', 'X'
+      ]))
+  }, [])
+
   const handleChange = (key, value) => onChange({ ...filters, [key]: value })
 
   const hasActiveFilters =
@@ -56,19 +68,37 @@ export default function FilterBar({ filters, onChange, onReset }) {
       <div className="flex flex-wrap gap-3 items-center">
         {/* Date range */}
         <div className="flex items-center gap-2">
-          <input type="date" value={filters.dateFrom || ''} onChange={e => handleChange('dateFrom', e.target.value)} className="input-field text-xs py-2 w-36"/>
+          <input
+            type="date"
+            value={filters.dateFrom || ''}
+            onChange={e => handleChange('dateFrom', e.target.value)}
+            className="input-field text-xs py-2 w-36"
+          />
           <span className="text-slate-400 text-xs">—</span>
-          <input type="date" value={filters.dateTo || ''} onChange={e => handleChange('dateTo', e.target.value)} className="input-field text-xs py-2 w-36"/>
+          <input
+            type="date"
+            value={filters.dateTo || ''}
+            onChange={e => handleChange('dateTo', e.target.value)}
+            className="input-field text-xs py-2 w-36"
+          />
         </div>
 
-        {/* Platform */}
-        <select value={filters.platform || 'All'} onChange={e => handleChange('platform', e.target.value)} className="input-field text-xs py-2 w-auto min-w-[140px]">
+        {/* Platform — loaded from DB */}
+        <select
+          value={filters.platform || 'All'}
+          onChange={e => handleChange('platform', e.target.value)}
+          className="input-field text-xs py-2 w-auto min-w-[140px]"
+        >
           <option value="All">All Platforms</option>
-          {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+          {platforms.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
 
         {/* Sentiment */}
-        <select value={filters.sentiment || 'All'} onChange={e => handleChange('sentiment', e.target.value)} className="input-field text-xs py-2 w-auto">
+        <select
+          value={filters.sentiment || 'All'}
+          onChange={e => handleChange('sentiment', e.target.value)}
+          className="input-field text-xs py-2 w-auto"
+        >
           <option value="All">All Sentiments</option>
           <option value="positive">Positive</option>
           <option value="neutral">Neutral</option>
@@ -76,7 +106,11 @@ export default function FilterBar({ filters, onChange, onReset }) {
         </select>
 
         {/* Risk */}
-        <select value={filters.riskLevel || 'All'} onChange={e => handleChange('riskLevel', e.target.value)} className="input-field text-xs py-2 w-auto">
+        <select
+          value={filters.riskLevel || 'All'}
+          onChange={e => handleChange('riskLevel', e.target.value)}
+          className="input-field text-xs py-2 w-auto"
+        >
           <option value="All">All Risk Levels</option>
           <option value="low">Low Risk</option>
           <option value="medium">Medium Risk</option>
@@ -84,7 +118,11 @@ export default function FilterBar({ filters, onChange, onReset }) {
         </select>
 
         {/* Intent */}
-        <select value={filters.intent || 'All'} onChange={e => handleChange('intent', e.target.value)} className="input-field text-xs py-2 w-auto min-w-[160px]">
+        <select
+          value={filters.intent || 'All'}
+          onChange={e => handleChange('intent', e.target.value)}
+          className="input-field text-xs py-2 w-auto min-w-[160px]"
+        >
           <option value="All">All Intents</option>
           {INTENTS.map(i => <option key={i} value={i}>{i}</option>)}
         </select>

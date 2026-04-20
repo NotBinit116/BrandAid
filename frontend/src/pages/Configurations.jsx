@@ -256,7 +256,10 @@ export default function Configurations() {
             {/* Social Handles */}
             <div className="card">
               <h2 className="font-display font-semibold text-lg text-slate-900 mb-1">Social Media Handles</h2>
-              <p className="text-sm text-slate-500 mb-4">Your brand's social media handles</p>
+              <p className="text-sm text-slate-500 mb-1">Your brand's social media handles</p>
+              <p className="text-xs text-slate-400 mb-4">
+                💡 Handles are used as additional search terms during crawling — e.g. adding <span className="font-mono bg-slate-100 px-1 rounded">@YourBrand</span> will find direct mentions across platforms.
+              </p>
               {handles.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-4">
                   {handles.map(h => (

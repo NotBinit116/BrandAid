@@ -10,8 +10,16 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts'
 
-const DEFAULT_FILTERS = { platform: 'All', sentiment: 'All', riskLevel: 'All', intent: 'All', dateFrom: '', dateTo: '' }
-const POSTS_PER_PAGE  = 10
+const DEFAULT_FILTERS = {
+  platform:  'All',
+  sentiment: 'All',
+  riskLevel: 'All',
+  intent:    'All',
+  dateFrom:  '',
+  dateTo:    '',
+}
+
+const POSTS_PER_PAGE = 10
 
 const INTENT_COLORS_MAP = {
   'PR Issue':           '#f97316',
@@ -25,6 +33,7 @@ const INTENT_COLORS_MAP = {
 
 export default function Dashboard() {
   const { user } = useAuth()
+
   const [brands, setBrands]               = useState([])
   const [activeBrand, setActiveBrand]     = useState(null)
   const [posts, setPosts]                 = useState([])
@@ -36,15 +45,17 @@ export default function Dashboard() {
   const [loadingBrands, setLoadingBrands] = useState(true)
   const [loadingPosts, setLoadingPosts]   = useState(false)
   const [crawling, setCrawling]           = useState(false)
-  const [page, setPage]                   = useState({ positive: 1, neutral: 1, negative: 1 })
   const [flaggedAuthors, setFlaggedAuthors] = useState([])
+
+  // Pagination per column — page index (1-based)
+  const [pages, setPages] = useState({ positive: 1, neutral: 1, negative: 1 })
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3500)
   }
 
-  // Load brands
+  // Load brands on mount
   useEffect(() => {
     const load = async () => {
       setLoadingBrands(true)
@@ -52,8 +63,11 @@ export default function Dashboard() {
         const res = await brandService.getAll()
         setBrands(res.data)
         if (res.data.length > 0) setActiveBrand(res.data[0])
-      } catch { showToast('Failed to load brands', 'error') }
-      finally { setLoadingBrands(false) }
+      } catch {
+        showToast('Failed to load brands', 'error')
+      } finally {
+        setLoadingBrands(false)
+      }
     }
     load()
   }, [])
@@ -66,10 +80,10 @@ export default function Dashboard() {
       .catch(() => {})
   }, [activeBrand])
 
-  // Load posts + metrics
+  // Load posts + metrics — reset pages on every load
   const loadPosts = useCallback(async () => {
     if (!activeBrand) return
-    setPage({ positive: 1, neutral: 1, negative: 1 })
+    setPages({ positive: 1, neutral: 1, negative: 1 })
     setLoadingPosts(true)
     try {
       const [postsRes, metricsRes] = await Promise.all([
@@ -90,8 +104,11 @@ export default function Dashboard() {
         intent_confidence: p.intent_confidence,
       })))
       setMetrics(metricsRes.data)
-    } catch { showToast('Failed to load posts', 'error') }
-    finally { setLoadingPosts(false) }
+    } catch {
+      showToast('Failed to load posts', 'error')
+    } finally {
+      setLoadingPosts(false)
+    }
   }, [activeBrand, filters])
 
   useEffect(() => { loadPosts() }, [loadPosts])
@@ -110,13 +127,26 @@ export default function Dashboard() {
       const data = await res.json()
       showToast(`Crawl complete — ${data.total_saved || 0} new mentions saved`)
       loadPosts()
-    } catch { showToast('Crawl failed', 'error') }
-    finally { setCrawling(false) }
+    } catch {
+      showToast('Crawl failed', 'error')
+    } finally {
+      setCrawling(false)
+    }
   }
 
+  // Split posts by sentiment
   const positivePosts = posts.filter(p => p.sentiment === 'positive')
   const neutralPosts  = posts.filter(p => p.sentiment === 'neutral')
   const negativePosts = posts.filter(p => p.sentiment === 'negative')
+
+  // Paginate a column
+  const paginate = (allPosts, key) => {
+    const pg    = pages[key]
+    const start = (pg - 1) * POSTS_PER_PAGE
+    return allPosts.slice(start, start + POSTS_PER_PAGE)
+  }
+
+  const totalPages = (allPosts) => Math.ceil(allPosts.length / POSTS_PER_PAGE)
 
   const PIE_DATA = metrics ? [
     { name: 'Positive', value: metrics.positive_mentions, color: '#10b981' },
@@ -147,6 +177,41 @@ export default function Dashboard() {
     )
   }
 
+  // Pagination controls component
+  const PaginationBar = ({ key, allPosts }) => {
+    const current = pages[key]
+    const total   = totalPages(allPosts)
+    if (total <= 1) return null
+    return (
+      <div className="flex items-center justify-between px-1 mt-1">
+        <button
+          onClick={() => setPages(p => ({ ...p, [key]: Math.max(1, p[key] - 1) }))}
+          disabled={current === 1}
+          className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M8.5 3L5 7l3.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Prev
+        </button>
+        <span className="text-xs text-slate-400">
+          {current} / {total}
+          <span className="ml-1 text-slate-300">({allPosts.length})</span>
+        </span>
+        <button
+          onClick={() => setPages(p => ({ ...p, [key]: Math.min(total, p[key] + 1) }))}
+          disabled={current === total}
+          className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+        >
+          Next
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M5.5 3L9 7l-3.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[#eef1f6]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -161,15 +226,27 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             {brands.length > 1 && (
-              <select value={activeBrand?.id || ''} onChange={e => setActiveBrand(brands.find(b => b.id === Number(e.target.value)))} className="input-field text-sm py-2 w-auto">
+              <select
+                value={activeBrand?.id || ''}
+                onChange={e => {
+                  setActiveBrand(brands.find(b => b.id === Number(e.target.value)))
+                  setFilters(DEFAULT_FILTERS)
+                }}
+                className="input-field text-sm py-2 w-auto"
+              >
                 {brands.map(b => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
               </select>
             )}
-            <button onClick={handleCrawl} disabled={crawling || !activeBrand} className="btn-secondary flex items-center gap-2 disabled:opacity-60">
-              {crawling
-                ? <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>Fetching…</>
-                : <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M13 1v4H9M1 13V9H5M13 5A6 6 0 0 1 2.1 9.5M1 9a6 6 0 0 1 10.9-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>Fetch Mentions</>
-              }
+            <button
+              onClick={handleCrawl}
+              disabled={crawling || !activeBrand}
+              className="btn-secondary flex items-center gap-2 disabled:opacity-60"
+            >
+              {crawling ? (
+                <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>Fetching…</>
+              ) : (
+                <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M13 1v4H9M1 13V9H5M13 5A6 6 0 0 1 2.1 9.5M1 9a6 6 0 0 1 10.9-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>Fetch Mentions</>
+              )}
             </button>
             <button onClick={() => setFlyoutOpen(true)} className="btn-primary flex items-center gap-2">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M1 11v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -198,7 +275,7 @@ export default function Dashboard() {
                     {flaggedAuthors.length} flagged author{flaggedAuthors.length > 1 ? 's' : ''} detected
                   </p>
                   <p className="text-xs text-orange-500">
-                    These authors consistently post negative content. Posts from flagged authors are marked with 🚩
+                    Posts from flagged authors are marked with 🚩
                   </p>
                 </div>
               </div>
@@ -241,11 +318,16 @@ export default function Dashboard() {
                 <div className="card flex flex-col justify-center gap-3">
                   <h2 className="font-display font-semibold text-slate-900">Brand Health</h2>
                   <div className="text-center py-4">
-                    <p className={`font-display font-bold text-5xl ${score >= 60 ? 'text-emerald-500' : score >= 40 ? 'text-amber-500' : 'text-red-500'}`}>{score}%</p>
+                    <p className={`font-display font-bold text-5xl ${score >= 60 ? 'text-emerald-500' : score >= 40 ? 'text-amber-500' : 'text-red-500'}`}>
+                      {score}%
+                    </p>
                     <p className="text-sm text-slate-500 mt-1">Positive sentiment rate</p>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-2.5">
-                    <div className={`h-2.5 rounded-full transition-all duration-500 ${score >= 60 ? 'bg-emerald-400' : score >= 40 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${score}%` }} />
+                    <div
+                      className={`h-2.5 rounded-full transition-all duration-500 ${score >= 60 ? 'bg-emerald-400' : score >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
+                      style={{ width: `${score}%` }}
+                    />
                   </div>
                   <p className="text-xs text-slate-400 text-center">{metrics.total_mentions.toLocaleString()} total mentions</p>
                 </div>
@@ -257,8 +339,11 @@ export default function Dashboard() {
                       <BarChart data={INTENT_BAR_DATA} layout="vertical" margin={{ left: 0, right: 10, top: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                         <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                        <YAxis type="category" dataKey="name" tick={{ fontSize: 9, fill: '#64748b' }} tickLine={false} axisLine={false} width={100}
-                          tickFormatter={v => v.length > 12 ? v.slice(0, 12) + '…' : v} />
+                        <YAxis
+                          type="category" dataKey="name"
+                          tick={{ fontSize: 9, fill: '#64748b' }} tickLine={false} axisLine={false} width={100}
+                          tickFormatter={v => v.length > 12 ? v.slice(0, 12) + '…' : v}
+                        />
                         <Tooltip contentStyle={{ borderRadius: '12px', fontSize: '12px', border: '1px solid #e2e8f0' }} formatter={v => [v, 'mentions']} />
                         <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                           {INTENT_BAR_DATA.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
@@ -271,7 +356,11 @@ export default function Dashboard() {
             )}
 
             {/* Filters */}
-            <FilterBar filters={filters} onChange={setFilters} onReset={() => setFilters(DEFAULT_FILTERS)} />
+            <FilterBar
+              filters={filters}
+              onChange={f => { setFilters(f); setPages({ positive: 1, neutral: 1, negative: 1 }) }}
+              onReset={() => { setFilters(DEFAULT_FILTERS); setPages({ positive: 1, neutral: 1, negative: 1 }) }}
+            />
 
             <div className="flex items-center gap-2 -mt-2">
               <span className="text-sm text-slate-500">
@@ -291,56 +380,34 @@ export default function Dashboard() {
               <div className="card text-center py-16">
                 <div className="text-4xl mb-3">🔍</div>
                 <h3 className="font-display font-semibold text-slate-800 mb-2">No mentions found</h3>
-                <p className="text-slate-500 text-sm mb-5">Click "Fetch Mentions" to crawl for brand mentions, or adjust your filters.</p>
+                <p className="text-slate-500 text-sm mb-5">
+                  Click "Fetch Mentions" to crawl for brand mentions, or adjust your filters.
+                </p>
                 <button onClick={handleCrawl} disabled={crawling} className="btn-primary">
                   {crawling ? 'Fetching…' : 'Fetch Mentions Now'}
                 </button>
               </div>
             )}
 
-            {/* Sentiment columns with pagination */}
+            {/* Sentiment columns */}
             {posts.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 stagger-children">
                 {[
-                  { key: 'positive', colPosts: positivePosts },
-                  { key: 'neutral',  colPosts: neutralPosts  },
-                  { key: 'negative', colPosts: negativePosts },
-                ].map(({ key, colPosts }) => {
-                  const currentPage = page[key]
-                  const totalPages  = Math.ceil(colPosts.length / POSTS_PER_PAGE)
-                  const paginated   = colPosts.slice((currentPage - 1) * POSTS_PER_PAGE, currentPage * POSTS_PER_PAGE)
-                  return (
-                    <div key={key} className="flex flex-col gap-3">
-                      <SentimentColumn
-                        sentiment={key}
-                        posts={paginated}
-                        onPostClick={setSelectedPost}
-                        flaggedAuthors={flaggedAuthors}
-                      />
-                      {totalPages > 1 && (
-                        <div className="flex items-center justify-between px-1">
-                          <button
-                            onClick={() => setPage(p => ({ ...p, [key]: Math.max(1, p[key] - 1) }))}
-                            disabled={currentPage === 1}
-                            className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1.5 rounded-lg hover:bg-slate-100"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L5 7l3.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                            Prev
-                          </button>
-                          <span className="text-xs text-slate-400">{currentPage} / {totalPages} <span className="text-slate-300">({colPosts.length})</span></span>
-                          <button
-                            onClick={() => setPage(p => ({ ...p, [key]: Math.min(totalPages, p[key] + 1) }))}
-                            disabled={currentPage === totalPages}
-                            className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1.5 rounded-lg hover:bg-slate-100"
-                          >
-                            Next
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5.5 3L9 7l-3.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+                  { key: 'positive', allPosts: positivePosts },
+                  { key: 'neutral',  allPosts: neutralPosts  },
+                  { key: 'negative', allPosts: negativePosts },
+                ].map(({ key, allPosts }) => (
+                  <div key={key} className="flex flex-col gap-3">
+                    <SentimentColumn
+                      sentiment={key}
+                      posts={paginate(allPosts, key)}
+                      totalCount={allPosts.length}
+                      onPostClick={setSelectedPost}
+                      flaggedAuthors={flaggedAuthors}
+                    />
+                    <PaginationBar key={key} allPosts={allPosts} />
+                  </div>
+                ))}
               </div>
             )}
           </>
@@ -366,7 +433,10 @@ export default function Dashboard() {
 
       {toast && (
         <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-xl text-sm font-semibold flex items-center gap-2 animate-slide-in-up ${toast.type === 'error' ? 'bg-red-600' : 'bg-emerald-600'} text-white`}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="white" strokeWidth="1.4"/><path d="M4.5 7l2 2 3-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="7" cy="7" r="6" stroke="white" strokeWidth="1.4"/>
+            <path d="M4.5 7l2 2 3-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
           {toast.msg}
         </div>
       )}
