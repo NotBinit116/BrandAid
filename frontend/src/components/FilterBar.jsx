@@ -24,19 +24,28 @@ const INTENT_COLORS = {
 export default function FilterBar({ filters, onChange, onReset }) {
   const [platforms, setPlatforms] = useState([])
 
-  // Load real platforms from DB
+  // Load platforms from DB — only shows what actually exists
   useEffect(() => {
     configService.getPlatforms()
-      .then(res => setPlatforms(res.data.map(p => p.name)))
-      .catch(() => setPlatforms([
-        'YouTube', 'Google News', 'HackerNews', 'Trustpilot', 'Reddit', 'X'
-      ]))
+      .then(res => {
+        // Only show enabled platforms
+        const enabled = res.data
+          .filter(p => p.enabled !== false)
+          .map(p => p.name)
+        setPlatforms(enabled)
+      })
+      .catch(() => {
+        // No fallback — if API fails, just show All
+        setPlatforms([])
+      })
   }, [])
 
-  const handleChange = (key, value) => onChange({ ...filters, [key]: value })
+  const handleChange = (key, value) => {
+    onChange({ ...filters, [key]: value })
+  }
 
   const hasActiveFilters =
-    filters.platform !== 'All' ||
+    filters.platform  !== 'All' ||
     filters.sentiment !== 'All' ||
     filters.riskLevel !== 'All' ||
     filters.intent    !== 'All' ||
@@ -66,6 +75,7 @@ export default function FilterBar({ filters, onChange, onReset }) {
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">
+
         {/* Date range */}
         <div className="flex items-center gap-2">
           <input
@@ -83,14 +93,16 @@ export default function FilterBar({ filters, onChange, onReset }) {
           />
         </div>
 
-        {/* Platform — loaded from DB */}
+        {/* Platform — only what's in DB */}
         <select
           value={filters.platform || 'All'}
           onChange={e => handleChange('platform', e.target.value)}
           className="input-field text-xs py-2 w-auto min-w-[140px]"
         >
           <option value="All">All Platforms</option>
-          {platforms.map(p => <option key={p} value={p}>{p}</option>)}
+          {platforms.map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
         </select>
 
         {/* Sentiment */}
@@ -124,8 +136,11 @@ export default function FilterBar({ filters, onChange, onReset }) {
           className="input-field text-xs py-2 w-auto min-w-[160px]"
         >
           <option value="All">All Intents</option>
-          {INTENTS.map(i => <option key={i} value={i}>{i}</option>)}
+          {INTENTS.map(i => (
+            <option key={i} value={i}>{i}</option>
+          ))}
         </select>
+
       </div>
 
       {/* Active intent badge */}
@@ -134,7 +149,28 @@ export default function FilterBar({ filters, onChange, onReset }) {
           <span className="text-xs text-slate-500">Filtering by intent:</span>
           <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${INTENT_COLORS[filters.intent] || 'bg-slate-100 text-slate-600'}`}>
             {filters.intent}
-            <button onClick={() => handleChange('intent', 'All')} className="hover:opacity-70">
+            <button
+              onClick={() => handleChange('intent', 'All')}
+              className="hover:opacity-70"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </span>
+        </div>
+      )}
+
+      {/* Active platform badge */}
+      {filters.platform && filters.platform !== 'All' && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500">Filtering by platform:</span>
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border bg-brand-50 text-brand-700 border-brand-200">
+            {filters.platform}
+            <button
+              onClick={() => handleChange('platform', 'All')}
+              className="hover:opacity-70"
+            >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                 <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
               </svg>

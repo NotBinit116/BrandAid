@@ -14,13 +14,10 @@ Base.metadata.create_all(bind=engine)
 from app.models.platform import Platform
 
 PLATFORMS = [
-    {"name": "Twitter",   "type": "social",  "enabled": True},
-    {"name": "Reddit",    "type": "forum",   "enabled": True},
-    {"name": "Instagram", "type": "social",  "enabled": True},
-    {"name": "Facebook",  "type": "social",  "enabled": True},
-    {"name": "LinkedIn",  "type": "social",  "enabled": True},
-    {"name": "YouTube",   "type": "video",   "enabled": True},
-    {"name": "TikTok",    "type": "video",   "enabled": True},
+    {"name": "YouTube",     "type": "video",  "enabled": True},
+    {"name": "Google News", "type": "news",   "enabled": True},
+    {"name": "HackerNews",  "type": "forum",  "enabled": True},
+    {"name": "Trustpilot",  "type": "review", "enabled": True},
 ]
 
 db = SessionLocal()
